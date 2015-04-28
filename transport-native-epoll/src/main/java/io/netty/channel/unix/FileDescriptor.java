@@ -20,6 +20,8 @@ import io.netty.channel.epoll.Native;
 import java.io.File;
 import java.io.IOException;
 
+import static io.netty.util.internal.ObjectUtil.checkNotNull;
+
 /**
  * Native {@link FileDescriptor} implementation which allows to wrap an {@code int} and provide a
  * {@link FileDescriptor} for it.
@@ -84,12 +86,23 @@ public class FileDescriptor {
 
     private static native int close(int fd);
 
-    public static FileDescriptor from(File file) throws IOException {
-        int res = open(file.getPath());
+    /**
+     * Open a new {@link FileDescriptor} for the given path.
+     */
+    public static FileDescriptor from(String path) throws IOException {
+        checkNotNull(path, "path");
+        int res = open(path);
         if (res < 0) {
             throw Native.newIOException("open", res);
         }
         return new FileDescriptor(res);
+    }
+
+    /**
+     * Open a new {@link FileDescriptor} for the given {@link File}.
+     */
+    public static FileDescriptor from(File file) throws IOException {
+        return from(checkNotNull(file, "file").getPath());
     }
 
     private static native int open(String path);

@@ -1607,7 +1607,7 @@ JNIEXPORT jlong JNICALL Java_io_netty_channel_epoll_Native_pipe0(JNIEnv* env, jc
     }
 
     // encode the fds into a long
-    return (((long)fd[0]) << 32) | (fd[1] & 0xffffffffL);
+    return (((long) fd[0]) << 32) | (fd[1] & 0xffffffffL);
 }
 
 JNIEXPORT jint JNICALL Java_io_netty_channel_epoll_Native_splice0(JNIEnv* env, jclass clazz, jint fd, jint offIn, jint fdOut, jint offOut, jint len) {

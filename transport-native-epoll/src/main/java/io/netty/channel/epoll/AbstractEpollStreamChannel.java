@@ -93,7 +93,18 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
     }
 
     /**
-     * @see {@link #spliceTo(AbstractEpollStreamChannel, int, ChannelPromise)}
+     * Splice from this {@link AbstractEpollStreamChannel} to another {@link AbstractEpollStreamChannel}.
+     * The {@code len} is the number of bytes to splice. If using {@link Integer#MAX_VALUE} it will
+     * splice until the {@link ChannelFuture} was canceled or it was failed.
+     *
+     * Please note:
+     * <ul>
+     *   <li>both channels need to be registered to the same {@link EventLoop}, otherwise an
+     *   {@link IllegalArgumentException} is thrown. </li>
+     *   <li>{@link EpollChannelConfig#getEpollMode()} must be {@link EpollMode#LEVEL_TRIGGERED} for this and the
+     *   target {@link AbstractEpollStreamChannel}</li>
+     * </ul>
+     *
      */
     public final ChannelFuture spliceTo(final AbstractEpollStreamChannel ch, final int len) {
         return spliceTo(ch, len, newPromise());
@@ -101,6 +112,8 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
 
     /**
      * Splice from this {@link AbstractEpollStreamChannel} to another {@link AbstractEpollStreamChannel}.
+     * The {@code len} is the number of bytes to splice. If using {@link Integer#MAX_VALUE} it will
+     * splice until the {@link ChannelFuture} was canceled or it was failed.
      *
      * Please note:
      * <ul>
@@ -117,12 +130,11 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
             throw new IllegalArgumentException("EventLoops are not the same");
         }
         if (len < 0) {
-            throw new IllegalArgumentException("len must be >= 0 but was " + len);
+            throw new IllegalArgumentException("len: " + len + " (expected: >= 0)");
         }
         if (ch.config().getEpollMode() != EpollMode.LEVEL_TRIGGERED
                 || config().getEpollMode() != EpollMode.LEVEL_TRIGGERED) {
-            throw new IllegalStateException("spliceTo(...) only supported when using "
-                    + EpollMode.LEVEL_TRIGGERED.name());
+            throw new IllegalStateException("spliceTo() supported only when using " + EpollMode.LEVEL_TRIGGERED);
         }
         checkNotNull(promise, "promise");
         if (!isOpen()) {
@@ -136,7 +148,17 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
     }
 
     /**
-     * @see {@link #spliceTo(FileDescriptor, int, int, ChannelPromise)}
+     * Splice from this {@link AbstractEpollStreamChannel} to another {@link FileDescriptor}.
+     * The {@code offset} is the offset for the {@link FileDescriptor} and {@code len} is the
+     * number of bytes to splice. If using {@link Integer#MAX_VALUE} it will splice until the
+     * {@link ChannelFuture} was canceled or it was failed.
+     *
+     * Please note:
+     * <ul>
+     *   <li>{@link EpollChannelConfig#getEpollMode()} must be {@link EpollMode#LEVEL_TRIGGERED} for this
+     *   {@link AbstractEpollStreamChannel}</li>
+     *   <li>the {@link FileDescriptor} will not be closed after the {@link ChannelFuture} is notified</li>
+     * </ul>
      */
     public final ChannelFuture spliceTo(final FileDescriptor ch, final int offset, final int len) {
         return spliceTo(ch, offset, len, newPromise());
@@ -144,6 +166,9 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
 
     /**
      * Splice from this {@link AbstractEpollStreamChannel} to another {@link FileDescriptor}.
+     * The {@code offset} is the offset for the {@link FileDescriptor} and {@code len} is the
+     * number of bytes to splice. If using {@link Integer#MAX_VALUE} it will splice until the
+     * {@link ChannelFuture} was canceled or it was failed.
      *
      * Please note:
      * <ul>
@@ -155,14 +180,13 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
     public final ChannelFuture spliceTo(final FileDescriptor ch, final int offset, final int len,
                                         final ChannelPromise promise) {
         if (len < 0) {
-            throw new IllegalArgumentException("len must be >= 0 but was " + len);
+            throw new IllegalArgumentException("len: " + len + " (expected: >= 0)");
         }
         if (offset < 0) {
             throw new IllegalArgumentException("offset must be >= 0 but was " + offset);
         }
         if (config().getEpollMode() != EpollMode.LEVEL_TRIGGERED) {
-            throw new IllegalStateException("spliceTo(...) only supported when using "
-                    + EpollMode.LEVEL_TRIGGERED.name());
+            throw new IllegalStateException("spliceTo() supported only when using " + EpollMode.LEVEL_TRIGGERED);
         }
         checkNotNull(promise, "promise");
         if (!isOpen()) {
@@ -465,10 +489,7 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
             return buf;
         }
 
-        if (msg instanceof DefaultFileRegion) {
-            return msg;
-        }
-        if (msg instanceof SpliceOutTask) {
+        if (msg instanceof DefaultFileRegion || msg instanceof SpliceOutTask) {
             return msg;
         }
 
@@ -499,13 +520,9 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
         try {
             // Calling super.doClose() first so splceTo(...) will fail on next call.
             super.doClose();
-            if (pipeIn != -1) {
-                Native.close(pipeIn);
-                Native.close(pipeOut);
-                pipeIn = -1;
-                pipeOut = -1;
-            }
         } finally {
+            safeClosePipe(pipeIn);
+            safeClosePipe(pipeOut);
             clearSpliceQueue();
         }
     }
@@ -539,6 +556,18 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
         } finally {
             if (!success) {
                 doClose();
+            }
+        }
+    }
+
+    private void safeClosePipe(int pipe) {
+        if (pipe != -1) {
+            try {
+                Native.close(pipe);
+            } catch (IOException e) {
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Error while closing a pipe", e);
+                }
             }
         }
     }
@@ -842,7 +871,7 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
         }
     }
 
-    protected abstract class SpliceInTask extends  MpscLinkedQueueNode<SpliceInTask> {
+    protected abstract class SpliceInTask extends MpscLinkedQueueNode<SpliceInTask> {
         final ChannelPromise promise;
         int len;
 
@@ -1040,18 +1069,6 @@ public abstract class AbstractEpollStreamChannel extends AbstractEpollChannel {
             } finally {
                 safeClosePipe(pipeIn);
                 safeClosePipe(pipeOut);
-            }
-        }
-
-        private void safeClosePipe(int pipe) {
-            if (pipe != -1) {
-                try {
-                    Native.close(pipe);
-                } catch (IOException e) {
-                    if (logger.isErrorEnabled()) {
-                        logger.error("Error while closing a pipe", e);
-                    }
-                }
             }
         }
     }
