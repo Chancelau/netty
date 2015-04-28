@@ -210,24 +210,7 @@ final class MpscLinkedQueue<E> extends MpscLinkedQueueTailRef<E> implements Queu
 
     @Override
     public Iterator<E> iterator() {
-        return new Iterator<E>() {
-            private final Iterator<E> it = toList(16).iterator();
-
-            @Override
-            public boolean hasNext() {
-                return it.hasNext();
-            }
-
-            @Override
-            public E next() {
-                return it.next();
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
+        return new ReadOnlyIterator<E>(toList().iterator());
     }
 
     @Override
@@ -257,8 +240,14 @@ final class MpscLinkedQueue<E> extends MpscLinkedQueueTailRef<E> implements Queu
     }
 
     private List<E> toList(int initialCapacity) {
-        List<E> elements = new ArrayList<E>(initialCapacity);
+        return toList(new ArrayList<E>(initialCapacity));
+    }
 
+    private List<E> toList() {
+        return toList(new ArrayList<E>());
+    }
+
+    private List<E> toList(List<E> elements) {
         MpscLinkedQueueNode<E> n = peekNode();
         for (;;) {
             if (n == null) {
@@ -280,7 +269,7 @@ final class MpscLinkedQueue<E> extends MpscLinkedQueueTailRef<E> implements Queu
 
     @Override
     public Object[] toArray() {
-        return toList(16).toArray();
+        return toList().toArray();
     }
 
     @Override
