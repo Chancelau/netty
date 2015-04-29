@@ -342,16 +342,7 @@ public final class FixedChannelPool extends SimpleChannelPool {
                 originalPromise.setSuccess(future.getNow());
             } else {
                 // Something went wrong try to run pending acquire tasks.
-                --acquiredChannelCount;
-
-                // We should never have a negative value.
-                assert acquiredChannelCount >= 0;
-
-                // Run the pending acquire tasks before notify the original promise so if the user would
-                // try to acquire again from the ChannelFutureListener and the pendingAcquireCount is >=
-                // maxPendingAcquires we may be able to run some pending tasks first and so allow to add
-                // more.
-                runTaskQueue();
+                decrementAndRunTaskQueue();
                 originalPromise.setFailure(future.cause());
             }
         }
