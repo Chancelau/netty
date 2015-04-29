@@ -73,7 +73,7 @@ public class SimpleChannelPoolTest {
         try {
             pool.release(channel2).syncUninterruptibly();
             fail();
-        } catch (IllegalStateException e) {
+        } catch (IllegalArgumentException e) {
             // expected
             assertFalse(channel.isActive());
         }

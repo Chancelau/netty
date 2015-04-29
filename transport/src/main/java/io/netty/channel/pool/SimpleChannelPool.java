@@ -216,7 +216,8 @@ public class SimpleChannelPool implements ChannelPool {
         if (channel.attr(POOL_KEY).getAndSet(null) != this) {
             closeAndFlail(channel,
                           // Better include a stracktrace here as this is an user error.
-                          new IllegalStateException("Channel " + channel + " was not acquired from this ChannelPool"),
+                          new IllegalArgumentException(
+                                  "Channel " + channel + " was not acquired from this ChannelPool"),
                           promise);
         } else {
             try {

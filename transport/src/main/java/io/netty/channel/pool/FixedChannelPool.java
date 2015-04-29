@@ -232,36 +232,40 @@ public final class FixedChannelPool extends SimpleChannelPool {
 
     @Override
     public Future<Void> release(final Channel channel, final Promise<Void> promise) {
-        try {
-            final Promise<Void> p = executor.newPromise();
-            super.release(channel, p.addListener(new FutureListener<Void>() {
+        final Promise<Void> p = executor.newPromise();
+        super.release(channel, p.addListener(new FutureListener<Void>() {
 
-                @Override
-                public void operationComplete(Future<Void> future) throws Exception {
-                    assert executor.inEventLoop();
+            @Override
+            public void operationComplete(Future<Void> future) throws Exception {
+                assert executor.inEventLoop();
 
-                    if (future.isSuccess()) {
-                        --acquiredChannelCount;
-
-                        // We should never have a negative value.
-                        assert acquiredChannelCount >= 0;
-
-                        // Run the pending acquire tasks before notify the original promise so if the user would
-                        // try to acquire again from the ChannelFutureListener and the pendingAcquireCount is >=
-                        // maxPendingAcquires we may be able to run some pending tasks first and so allow to add
-                        // more.
-                        runTaskQueue();
-                        promise.setSuccess(null);
-                    } else {
-                        promise.setFailure(future.cause());
+                if (future.isSuccess()) {
+                    decrementAndRunTaskQueue();
+                    promise.setSuccess(null);
+                } else {
+                    Throwable cause = future.cause();
+                    // Check if the exception was not because of we passed the Channel to the wrong pool.
+                    if (!(cause instanceof IllegalArgumentException)) {
+                        decrementAndRunTaskQueue();
                     }
+                    promise.setFailure(future.cause());
                 }
-            }));
-            return p;
-        } catch (Throwable cause) {
-            promise.setFailure(cause);
-        }
-        return promise;
+            }
+        }));
+        return p;
+    }
+
+    private void decrementAndRunTaskQueue() {
+        --acquiredChannelCount;
+
+        // We should never have a negative value.
+        assert acquiredChannelCount >= 0;
+
+        // Run the pending acquire tasks before notify the original promise so if the user would
+        // try to acquire again from the ChannelFutureListener and the pendingAcquireCount is >=
+        // maxPendingAcquires we may be able to run some pending tasks first and so allow to add
+        // more.
+        runTaskQueue();
     }
 
     private void runTaskQueue() {

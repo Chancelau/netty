@@ -188,7 +188,7 @@ public class FixedChannelPoolTest {
         }
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testReleaseDifferentPool() throws Exception {
         EventLoopGroup group = new LocalEventLoopGroup();
         LocalAddress addr = new LocalAddress(LOCAL_ADDR_ID);
