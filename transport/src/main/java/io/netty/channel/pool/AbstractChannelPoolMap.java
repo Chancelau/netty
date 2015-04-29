@@ -39,10 +39,23 @@ public abstract class AbstractChannelPoolMap<K, P extends ChannelPool>
             pool = newPool(key);
             P old = map.putIfAbsent(key, pool);
             if (old != null) {
+                // We need to destroy the newly created pool as we not use it.
+                destroyPool(pool);
                 pool = old;
             }
         }
         return pool;
+    }
+
+    /**
+     * Is called once a {@link ChannelPool} is removed an so allow to release resources
+     * that were created when the {@link ChannelPool} was created before.
+     *
+     * This implementation does nothing by default, sub-classes may override this if special
+     * handling is needed.
+     */
+    protected void destroyPool(@SuppressWarnings("unused") P pool) {
+        // NOOP
     }
 
     /**
@@ -52,7 +65,12 @@ public abstract class AbstractChannelPoolMap<K, P extends ChannelPool>
      * Please note that {@code null} keys are not allowed.
      */
     public final boolean remove(K key) {
-        return map.remove(checkNotNull(key, "key")) != null;
+        P pool =  map.remove(checkNotNull(key, "key"));
+        if (pool != null) {
+            destroyPool(pool);
+            return true;
+        }
+        return false;
     }
 
     @Override

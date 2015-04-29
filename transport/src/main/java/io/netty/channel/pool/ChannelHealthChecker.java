@@ -24,7 +24,7 @@ import io.netty.util.concurrent.Promise;
  * Called before a {@link Channel} will be returned via {@link ChannelPool#acquire()} or
  * {@link ChannelPool#acquire(Promise)}.
  */
-public interface    ChannelHealthChecker {
+public interface ChannelHealthChecker {
 
     /**
      * {@link ChannelHealthChecker} implementation that checks if {@link Channel#isActive()} returns {@code true}.
