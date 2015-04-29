@@ -23,7 +23,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalEventLoopGroup;
-import io.netty.util.concurrent.Future;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -54,7 +53,6 @@ public class AbstractChannelPoolMapTest {
         assertEquals(0, poolMap.size());
 
         SimpleChannelPool pool = poolMap.get(loop);
-        Future<Channel> f = pool.acquire();
         assertEquals(1, poolMap.size());
         assertTrue(poolMap.iterator().hasNext());
 
@@ -65,7 +63,7 @@ public class AbstractChannelPoolMapTest {
         assertFalse(poolMap.iterator().hasNext());
         assertEquals(0, poolMap.size());
 
-        f.syncUninterruptibly();
+        pool.acquire().syncUninterruptibly();
     }
 
     private static final class TestChannelPoolHandler extends AbstractChannelPoolHandler {

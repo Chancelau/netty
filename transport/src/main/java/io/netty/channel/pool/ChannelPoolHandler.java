@@ -15,7 +15,6 @@
  */
 package io.netty.channel.pool;
 
-
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.Promise;
@@ -29,8 +28,6 @@ public interface ChannelPoolHandler {
      * {@link ChannelPool#release(Channel, Promise)}.
      *
      * This method will be called by the {@link EventLoop} of the {@link Channel}.
-     *
-     * @param ch        the {@link Channel}
      */
     void channelReleased(Channel ch) throws Exception;
 
@@ -39,8 +36,6 @@ public interface ChannelPoolHandler {
      * {@link ChannelPool#acquire(Promise)}.
      *
      * This method will be called by the {@link EventLoop} of the {@link Channel}.
-     *
-     * @param ch       the {@link Channel}
      */
     void channelAcquired(Channel ch) throws Exception;
 
@@ -48,8 +43,6 @@ public interface ChannelPoolHandler {
      * Called once a new {@link Channel} is created in the {@link ChannelPool}.
      *
      * This method will be called by the {@link EventLoop} of the {@link Channel}.
-     *
-     * @param ch        the {@link Channel}
      */
     void channelCreated(Channel ch) throws Exception;
 }

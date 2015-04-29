@@ -43,7 +43,7 @@ public interface ChannelPool {
     Future<Void> release(Channel channel);
 
     /**
-     * Release a {@link Channel} back to this {@link ChannelPool}.  The given {@link Promise} is notified once
+     * Release a {@link Channel} back to this {@link ChannelPool}. The given {@link Promise} is notified once
      * the release is successful and failed otherwise. When failed the {@link Channel} will automatically closed.
      */
     Future<Void> release(Channel channel, Promise<Void> promise);

@@ -57,10 +57,10 @@ public class FixedChannelPoolTest {
           });
 
         // Start server
-        Channel sc = sb.bind(addr).sync().channel();
+        Channel sc = sb.bind(addr).syncUninterruptibly().channel();
         CountingChannelPoolHandler handler = new CountingChannelPoolHandler();
 
-        ChannelPool pool  = new FixedChannelPool(cb, handler, 1, Integer.MAX_VALUE);
+        ChannelPool pool = new FixedChannelPool(cb, handler, 1, Integer.MAX_VALUE);
 
         Channel channel = pool.acquire().syncUninterruptibly().getNow();
         Future<Channel> future = pool.acquire();
@@ -76,8 +76,8 @@ public class FixedChannelPoolTest {
         assertEquals(1, handler.acquiredCount());
         assertEquals(1, handler.releasedCount());
 
-        sc.close().sync();
-        channel2.close().sync();
+        sc.close().syncUninterruptibly();
+        channel2.close().syncUninterruptibly();
         group.shutdownGracefully();
     }
 
@@ -101,18 +101,18 @@ public class FixedChannelPoolTest {
           });
 
         // Start server
-        Channel sc = sb.bind(addr).sync().channel();
+        Channel sc = sb.bind(addr).syncUninterruptibly().channel();
         ChannelPoolHandler handler = new TestChannelPoolHandler();
-        ChannelPool pool  = new FixedChannelPool(cb, handler, ChannelHealthChecker.ACTIVE,
+        ChannelPool pool = new FixedChannelPool(cb, handler, ChannelHealthChecker.ACTIVE,
                                                  AcquireTimeoutAction.Fail, 500, 1, Integer.MAX_VALUE);
 
-        Channel channel = pool.acquire().sync().getNow();
+        Channel channel = pool.acquire().syncUninterruptibly().getNow();
         Future<Channel> future = pool.acquire();
         try {
-            future.sync();
+            future.syncUninterruptibly();
         } finally {
-            sc.close().sync();
-            channel.close().sync();
+            sc.close().syncUninterruptibly();
+            channel.close().syncUninterruptibly();
             group.shutdownGracefully();
         }
     }
@@ -137,17 +137,17 @@ public class FixedChannelPoolTest {
           });
 
         // Start server
-        Channel sc = sb.bind(addr).sync().channel();
+        Channel sc = sb.bind(addr).syncUninterruptibly().channel();
         ChannelPoolHandler handler = new TestChannelPoolHandler();
-        ChannelPool pool  = new FixedChannelPool(cb, handler, ChannelHealthChecker.ACTIVE,
+        ChannelPool pool = new FixedChannelPool(cb, handler, ChannelHealthChecker.ACTIVE,
                 AcquireTimeoutAction.NewConnection, 500, 1, Integer.MAX_VALUE);
 
-        Channel channel = pool.acquire().sync().getNow();
-        Channel channel2 = pool.acquire().sync().getNow();
+        Channel channel = pool.acquire().syncUninterruptibly().getNow();
+        Channel channel2 = pool.acquire().syncUninterruptibly().getNow();
         assertNotSame(channel, channel2);
-        sc.close().sync();
-        channel.close().sync();
-        channel2.close().sync();
+        sc.close().syncUninterruptibly();
+        channel.close().syncUninterruptibly();
+        channel2.close().syncUninterruptibly();
         group.shutdownGracefully();
     }
 
@@ -171,19 +171,55 @@ public class FixedChannelPoolTest {
           });
 
         // Start server
-        Channel sc = sb.bind(addr).sync().channel();
+        Channel sc = sb.bind(addr).syncUninterruptibly().channel();
         ChannelPoolHandler handler = new TestChannelPoolHandler();
-        ChannelPool pool  = new FixedChannelPool(cb, handler, 1, 1);
+        ChannelPool pool = new FixedChannelPool(cb, handler, 1, 1);
 
-        Channel channel = pool.acquire().sync().getNow();
+        Channel channel = pool.acquire().syncUninterruptibly().getNow();
         Future<Channel> future = pool.acquire();
         assertFalse(future.isDone());
 
         try {
-            pool.acquire().sync();
+            pool.acquire().syncUninterruptibly();
         } finally {
-            sc.close().sync();
-            channel.close().sync();
+            sc.close().syncUninterruptibly();
+            channel.close().syncUninterruptibly();
+            group.shutdownGracefully();
+        }
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testReleaseDifferentPool() throws Exception {
+        EventLoopGroup group = new LocalEventLoopGroup();
+        LocalAddress addr = new LocalAddress(LOCAL_ADDR_ID);
+        Bootstrap cb = new Bootstrap();
+        cb.remoteAddress(addr);
+        cb.group(group)
+          .channel(LocalChannel.class);
+
+        ServerBootstrap sb = new ServerBootstrap();
+        sb.group(group)
+          .channel(LocalServerChannel.class)
+          .childHandler(new ChannelInitializer<LocalChannel>() {
+              @Override
+              public void initChannel(LocalChannel ch) throws Exception {
+                  ch.pipeline().addLast(new ChannelInboundHandlerAdapter());
+              }
+          });
+
+        // Start server
+        Channel sc = sb.bind(addr).syncUninterruptibly().channel();
+        ChannelPoolHandler handler = new TestChannelPoolHandler();
+        ChannelPool pool = new FixedChannelPool(cb, handler, 1, 1);
+        ChannelPool pool2 = new FixedChannelPool(cb, handler, 1, 1);
+
+        Channel channel = pool.acquire().syncUninterruptibly().getNow();
+
+        try {
+            pool2.release(channel).syncUninterruptibly();
+        } finally {
+            sc.close().syncUninterruptibly();
+            channel.close().syncUninterruptibly();
             group.shutdownGracefully();
         }
     }

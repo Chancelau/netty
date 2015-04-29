@@ -16,6 +16,7 @@
 package io.netty.channel.pool;
 
 import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.ReadOnlyIterator;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
@@ -47,6 +48,8 @@ public abstract class AbstractChannelPoolMap<K, P extends ChannelPool>
     /**
      * Remove the {@link ChannelPool} from this {@link AbstractChannelPoolMap}. Returns {@code true} if removed,
      * {@code false} otherwise.
+     *
+     * Please note that {@code null} keys are not allowed.
      */
     public final boolean remove(K key) {
         return map.remove(checkNotNull(key, "key")) != null;
@@ -54,7 +57,7 @@ public abstract class AbstractChannelPoolMap<K, P extends ChannelPool>
 
     @Override
     public final Iterator<Entry<K, P>> iterator() {
-        return map.entrySet().iterator();
+        return new ReadOnlyIterator<Entry<K, P>>(map.entrySet().iterator());
     }
 
     /**
@@ -65,8 +68,19 @@ public abstract class AbstractChannelPoolMap<K, P extends ChannelPool>
     }
 
     /**
+     * Returns {@code true} if the {@link AbstractChannelPoolMap} is empty, otherwise {@code false}.
+     */
+    public final boolean isEmpty() {
+        return map.isEmpty();
+    }
+
+    @Override
+    public final boolean contains(K key) {
+        return map.containsKey(checkNotNull(key, "key"));
+    }
+
+    /**
      * Called once a new {@link ChannelPool} needs to be created as non exists yet for the {@code key}.
      */
     protected abstract P newPool(K key);
-
 }

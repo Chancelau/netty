@@ -173,7 +173,8 @@ public final class FixedChannelPool extends SimpleChannelPool {
         this.maxPendingAcquires = maxPendingAcquires;
     }
 
-    private static long nanoTime() {
+    // We substract here to guard against overflow.
+    private static long timeSinceClassInit() {
         return System.nanoTime() - START_TIME;
     }
 
@@ -265,7 +266,7 @@ public final class FixedChannelPool extends SimpleChannelPool {
 
     private void runTaskQueue() {
         while (acquiredChannelCount <= maxConnections) {
-            AcquireTask  task = pendingAcquireQueue.poll();
+            AcquireTask task = pendingAcquireQueue.poll();
             if (task == null) {
                 break;
             }
@@ -290,7 +291,7 @@ public final class FixedChannelPool extends SimpleChannelPool {
     // AcquireTask extends AcquireListener to reduce object creations and so GC pressure
     private final class AcquireTask extends AcquireListener {
         final Promise<Channel> promise;
-        final long creationTime = nanoTime();
+        final long creationTime = timeSinceClassInit();
         ScheduledFuture<?> timeoutFuture;
 
         public AcquireTask(Promise<Channel> promise) {
@@ -306,7 +307,7 @@ public final class FixedChannelPool extends SimpleChannelPool {
         public final void run() {
             assert executor.inEventLoop();
 
-            long expiredThresholdTime = nanoTime() - acquireTimeoutNanos;
+            long expiredThresholdTime = timeSinceClassInit() - acquireTimeoutNanos;
             for (;;) {
                 AcquireTask task = pendingAcquireQueue.peek();
                 if (task == null || task.creationTime >= expiredThresholdTime) {
